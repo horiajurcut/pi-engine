@@ -1,0 +1,11 @@
+# Based on Google format.
+
+---
+BasedOnStyle: Google
+ColumnLimit: 100
+PointerAlignment: Right
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: Linux
+MaxEmptyLinesToKeep: 2
+---
