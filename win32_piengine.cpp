@@ -47,14 +47,15 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
   /* Initializes all the elements of the struct with 0 */
   WNDCLASS WindowClass = {};
 
-  WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+  /* We don't really need to set the style */
+  // WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
   WindowClass.lpfnWndProc = MainWindowCallback;
   WindowClass.hInstance = hInstance;
   // TODO(horia): Set hIcon on WindowClass
   WindowClass.lpszClassName = "PiEngineWindowClass";
 
-  if (RegisterClass(&WindowClass)) {
-    HWND WindowHandle = CreateWindowEx(
+  if (RegisterClassA(&WindowClass)) {
+    HWND WindowHandle = CreateWindowExA(
         0, WindowClass.lpszClassName, "Pi Engine", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT,
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, hInstance, 0);
 
@@ -62,11 +63,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
       for (;;) {
         MSG Message;
         /* WindowHandle is 0 so we can retrieve messages from any of our windows */
-        BOOL MessageResult = GetMessage(&Message, 0, 0, 0);
+        BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
 
         if (MessageResult > 0) {
           TranslateMessage(&Message);
-          DispatchMessage(&Message);
+          DispatchMessageA(&Message);
         } else {
           break;
         }
