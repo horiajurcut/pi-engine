@@ -9,3 +9,6 @@
     * Creating a **WindowClass** and registering it
     * Handling Windows messages
     * Use the **WM_PAINT** message to paint the screen white
+* Day 003: Allocating a Back Buffer
+    * Implement **Win32ResizeDIBSection**
+    * Implement **Win32UpdateWindow**
