@@ -1,47 +1,114 @@
+#include <stdint.h>
 #include <windows.h>
 
 #define internal static
 #define local_persist static
 #define global_variable static
 
-// TODO(horia): This is a global for now
+// TODO: This is a global for now
 global_variable bool Running;
 global_variable BITMAPINFO BitmapInfo;
 global_variable void *BitmapMemory;
-global_variable HBITMAP BitmapHandle;
-global_variable HDC BitmapDeviceContext;
+global_variable int BitmapWidth;
+global_variable int BitmapHeight;
+global_variable int BytesPerPixel = 4;
+
+internal void RenderWeirdGradient8(int XOffset, int YOffset)
+{
+  int Width = BitmapWidth;
+  int Height = BitmapHeight;
+
+  // NOTE: Draw some pixels on the screen
+  int Pitch = Width * BytesPerPixel;
+  // Strides don't always align at pixel boundaries?
+  uint8_t *Row = (uint8_t *)BitmapMemory;
+  for (int Y = 0; Y < BitmapHeight; Y++) {
+    uint8_t *Pixel = (uint8_t *)Row;
+    for (int X = 0; X < BitmapWidth; X++) {
+      /* Pixel in memory: RR GG BB -- (HEX)
+         Pixel in memory in Windows: BB GG RR --
+         LITTLE ENDIAN ARCHITECTURE: 0x00BBGGRR */
+      // NOTE: BLUE
+      *Pixel = (uint8_t)(X + XOffset);
+      ++Pixel;
+
+      // NOTE: GREEN
+      *Pixel = (uint8_t)(Y + YOffset);
+      ++Pixel;
+
+      // NOTE: RED
+      *Pixel = 0;
+      ++Pixel;
+
+      // NOTE: PADDING
+      *Pixel = 0;
+      ++Pixel;
+    }
+    Row += Pitch;
+  }
+}
+
+internal void RenderWeirdGradient32(int XOffset, int YOffset)
+{
+  int Width = BitmapWidth;
+  int Height = BitmapHeight;
+  int Pitch = Width * BytesPerPixel;
+
+  uint8_t *Row = (uint8_t *)BitmapMemory;
+  for (int Y = 0; Y < BitmapHeight; Y++) {
+    uint32_t *Pixel = (uint32_t *)Row;
+    for (int X = 0; X < BitmapWidth; X++) {
+      uint8_t Blue = X + XOffset;
+      uint8_t Green = Y + YOffset;
+      uint8_t Red = 0;
+      *Pixel++ = (Red << 16) | (Green << 8) | Blue;
+    }
+    Row += Pitch;
+  }
+}
 
 // DIB = Device Independent Bitmap
 internal void Win32ResizeDIBSection(int Width, int Height)
 {
-  // TODO(horia): Bulletproof this
+  // TODO: Bulletproof this
   // Maybe don't free first, free after, then free first if that fails
 
-  // TODO(horia): Free it
-  if (BitmapHandle) {
-    DeleteObject(BitmapHandle);
+  if (BitmapMemory) {
+    // NOTE: If dwSize is 0 it will free up all the memory
+    VirtualFree(BitmapMemory, 0, MEM_RELEASE);
   }
 
-  if (!BitmapDeviceContext) {
-    // TODO(horia): Should we recreate these under special circumstances?
-    BitmapDeviceContext = CreateCompatibleDC(0);
-  }
+  BitmapWidth = Width;
+  BitmapHeight = Height;
 
   BitmapInfo.bmiHeader.biSize = sizeof(BitmapInfo.bmiHeader);
-  BitmapInfo.bmiHeader.biWidth = Width;
-  BitmapInfo.bmiHeader.biHeight = Height;
+  BitmapInfo.bmiHeader.biWidth = BitmapWidth;
+  BitmapInfo.bmiHeader.biHeight = -BitmapHeight;  // Negative height -> top-down DIB
   BitmapInfo.bmiHeader.biPlanes = 1;
   BitmapInfo.bmiHeader.biBitCount = 32;  // NOTE: For alignment reasons, RGB is 24
   BitmapInfo.bmiHeader.biCompression = BI_RGB;
 
-  BitmapHandle =
-      CreateDIBSection(BitmapDeviceContext, &BitmapInfo, DIB_RGB_COLORS, &BitmapMemory, 0, 0);
+  // NOTE: Difference between StretchDIBits and BitBlt
+  // DeviceContext is not needed any more
+  int BytesPerPixel = 4;
+  int BitmapMemorySize = (BitmapWidth * BitmapHeight) * BytesPerPixel;
+  BitmapMemory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+
+  // TODO: Probably want to clear to #000000
 }
 
-internal void Win32UpdateWindow(HDC DeviceContext, int X, int Y, int Width, int Height)
+internal void Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width,
+                                int Height)
 {
-  StretchDIBits(DeviceContext, X, Y, Width, Height, X, Y, Width, Height, BitmapMemory, &BitmapInfo,
-                DIB_RGB_COLORS, SRCCOPY);
+  // NOTE: Pitch
+  // Value you would add to a pointer to move it from the current row to the next row
+  int WindowWidth = ClientRect->right - ClientRect->left;
+  int WindowHeight = ClientRect->bottom - ClientRect->top;
+
+  StretchDIBits(DeviceContext,
+                /* X, Y, Width, Height, X, Y, Width, Height, */
+                0, 0, BitmapWidth, BitmapHeight, 0, 0, WindowWidth, WindowHeight, BitmapMemory,
+                &BitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 }
 
 LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
@@ -58,12 +125,12 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wPara
     } break;
 
     case WM_DESTROY: {
-      // TODO(horia): Handle this with an error?
+      // TODO: Handle this with an error?
       Running = false;
     } break;
 
     case WM_CLOSE: {
-      // TODO(horia): Handle this with a message to the user?
+      // TODO: Handle this with a message to the user?
       Running = false;
     } break;
 
@@ -78,7 +145,11 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wPara
       int Y = Paint.rcPaint.top;
       int Width = Paint.rcPaint.right - Paint.rcPaint.left;
       int Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
-      Win32UpdateWindow(DeviceContext, X, Y, Width, Height);
+
+      RECT ClientRect;
+      GetClientRect(Window, &ClientRect);
+      Win32UpdateWindow(DeviceContext, &ClientRect, X, Y, Width, Height);
+
       EndPaint(Window, &Paint);
     } break;
 
@@ -100,7 +171,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
   // WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
   WindowClass.lpfnWndProc = Win32MainWindowCallback;
   WindowClass.hInstance = hInstance;
-  // TODO(horia): Set hIcon on WindowClass
+  // TODO: Set hIcon on WindowClass
   WindowClass.lpszClassName = "PiEngineWindowClass";
 
   if (RegisterClassA(&WindowClass)) {
@@ -110,23 +181,37 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
     if (WindowHandle) {
       Running = true;
+      int XOffset = 0;
+      int YOffset = 0;
+
       while (Running) {
         MSG Message;
-        /* WindowHandle is 0 so we can retrieve messages from any of our windows */
-        BOOL MessageResult = GetMessageA(&Message, 0, 0, 0);
-
-        if (MessageResult > 0) {
+        // NOTE: WindowHandle is 0 so we can retrieve messages from any of our windows
+        while (PeekMessageA(&Message, 0, 0, 0, PM_REMOVE)) {
+          if (Message.message == WM_QUIT) {
+            Running = false;
+          }
           TranslateMessage(&Message);
           DispatchMessageA(&Message);
-        } else {
-          break;
         }
+
+        RenderWeirdGradient32(XOffset, 0);
+
+        HDC DeviceContext = GetDC(WindowHandle);
+        RECT ClientRect;
+        GetClientRect(WindowHandle, &ClientRect);
+        int WindowWidth = ClientRect.right - ClientRect.left;
+        int WindowHeight = ClientRect.bottom - ClientRect.top;
+        Win32UpdateWindow(DeviceContext, &ClientRect, 0, 0, WindowWidth, WindowHeight);
+        ReleaseDC(WindowHandle, DeviceContext);
+
+        ++XOffset;
       }
     } else {
-      // TODO(horia): Logging if CreateWindowEx fails
+      // TODO: Logging if CreateWindowEx fails
     }
   } else {
-    // TODO(horia): Logging if registering fails
+    // TODO: Logging if registering fails
   }
 
   return 0;
