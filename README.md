@@ -12,3 +12,7 @@
 * Day 003: Allocating a Back Buffer
     * Implement **Win32ResizeDIBSection**
     * Implement **Win32UpdateWindow**
+* Day 004: Animating the Back Buffer
+    * Implement **RenderWeirdGradient** writing 8 and 32 bits at a time
+* Day 005: Windows Graphics Review
+    * Refactor code and clean-up
