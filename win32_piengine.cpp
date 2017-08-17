@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <windows.h>
+#include <xinput.h>
 
 #define internal static
 #define local_persist static
@@ -22,6 +23,40 @@ struct win32_window_dimension {
 global_variable bool GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 
+// NOTE: XInputGetState
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+typedef X_INPUT_GET_STATE(x_input_get_state);
+
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+  return 0;
+}
+
+global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+#define XInputGetState XInputGetState_
+
+// NOTE: XInputSetState
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+  return 0;
+}
+
+global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
+#define XInputSetState XInputSetState_
+
+internal void Win32LoadXInput(void)
+{
+  HMODULE XInputLibrary = LoadLibrary("xinput1_3.dll");
+
+  if (XInputLibrary) {
+    XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
+    XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary, "XInputSetState");
+  }
+}
+
 internal void RenderWeirdGradient32(win32_offscreen_buffer Buffer, int XOffset, int YOffset)
 {
   uint8_t *Row = (uint8_t *)Buffer.Memory;
@@ -37,7 +72,7 @@ internal void RenderWeirdGradient32(win32_offscreen_buffer Buffer, int XOffset, 
   }
 }
 
-win32_window_dimension Win32GetWindowDimension(HWND Window)
+internal win32_window_dimension Win32GetWindowDimension(HWND Window)
 {
   win32_window_dimension Result;
   RECT ClientRect;
@@ -126,6 +161,9 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wPara
 
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
+  // NOTE: Load xinput library
+  Win32LoadXInput();
+
   /* Initializes all the elements of the struct with 0 */
   WNDCLASS WindowClass = {};
 
@@ -161,15 +199,54 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
           DispatchMessageA(&Message);
         }
 
+        // TODO: Should we pull this more frequently?
+        DWORD ControllerStateResult;
+        for (DWORD ControllerIndex = 0; ControllerIndex < XUSER_MAX_COUNT; ControllerIndex++) {
+          XINPUT_STATE ControllerState;
+          ZeroMemory(&ControllerState, sizeof(XINPUT_STATE));
+          ControllerStateResult = XInputGetState(ControllerIndex, &ControllerState);
+          if (ControllerStateResult == ERROR_SUCCESS) {
+            // NOTE: Controller is connected
+            XINPUT_GAMEPAD *GamePad = &ControllerState.Gamepad;
+
+            bool DPadUp = GamePad->wButtons & XINPUT_GAMEPAD_DPAD_UP;
+            bool DPadDown = GamePad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
+            bool DPadLeft = GamePad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
+            bool DPadRight = GamePad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
+            bool StartButton = GamePad->wButtons & XINPUT_GAMEPAD_START;
+            bool BackButton = GamePad->wButtons & XINPUT_GAMEPAD_BACK;
+            bool LeftShoulder = GamePad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER;
+            bool RightShoulder = GamePad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER;
+            bool AButton = GamePad->wButtons & XINPUT_GAMEPAD_A;
+            bool BButton = GamePad->wButtons & XINPUT_GAMEPAD_B;
+            bool XButton = GamePad->wButtons & XINPUT_GAMEPAD_X;
+            bool YButton = GamePad->wButtons & XINPUT_GAMEPAD_Y;
+
+            int16_t ThumbLX = GamePad->sThumbLX;
+            int16_t ThumbLY = GamePad->sThumbLY;
+
+            // NOTE: Small test to see if the controller code is working
+            if (AButton) {
+              YOffset += 2;
+            }
+          } else {
+            // NOTE: Controller is not connected
+          }
+        }
+        // XINPUT_VIBRATION Vibration;
+        // Vibration.wLeftMotorSpeed = 60000;
+        // Vibration.wRightMotorSpeed = 60000;
+        // XInputSetState(0, &Vibration);
+
         RenderWeirdGradient32(GlobalBackBuffer, XOffset, YOffset);
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
         Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height,
                                    GlobalBackBuffer);
-        ReleaseDC(Window, DeviceContext);
 
         ++XOffset;
-        ++YOffset;
       }
+      // TODO: We may not need to release the DC at all?
+      ReleaseDC(Window, DeviceContext);
     } else {
       // TODO: Logging if CreateWindowEx fails
     }

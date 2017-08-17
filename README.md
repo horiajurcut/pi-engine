@@ -16,3 +16,5 @@
     * Implement **RenderWeirdGradient** writing 8 and 32 bits at a time
 * Day 005: Windows Graphics Review
     * Refactor code and clean-up
+* Day 006: Gamepad and Keyboard Input
+    * Implement XInput (Controller) support
