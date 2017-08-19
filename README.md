@@ -18,3 +18,4 @@
     * Refactor code and clean-up
 * Day 006: Gamepad and Keyboard Input
     * Implement XInput (Controller) support
+    * Implement keyboard support

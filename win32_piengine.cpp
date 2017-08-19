@@ -49,7 +49,7 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 
 internal void Win32LoadXInput(void)
 {
-  HMODULE XInputLibrary = LoadLibrary("xinput1_3.dll");
+  HMODULE XInputLibrary = LoadLibraryA("xinput1_3.dll");
 
   if (XInputLibrary) {
     XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
@@ -141,6 +141,48 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wPara
       OutputDebugStringA("WM_ACTIVATEAPP\n");
     } break;
 
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP: {
+      uint32_t VirtualKeyCode = wParam;
+      bool WasDown = (lParam & (1 << 30)) != 0;
+      bool IsDown = (lParam & (1 << 31)) == 0;
+
+      if (VirtualKeyCode == 'W') {
+        OutputDebugStringA("UP");
+      } else if (VirtualKeyCode == 'S') {
+        OutputDebugStringA("DOWN");
+      } else if (VirtualKeyCode == 'A') {
+        OutputDebugStringA("LEFT");
+      } else if (VirtualKeyCode == 'D') {
+        OutputDebugStringA("RIGHT");
+      } else if (VirtualKeyCode == 'Q') {
+        OutputDebugStringA("Q");
+      } else if (VirtualKeyCode == 'E') {
+        OutputDebugStringA("E");
+      } else if (VirtualKeyCode == VK_UP) {
+        OutputDebugStringA("ARROW UP");
+      } else if (VirtualKeyCode == VK_DOWN) {
+        OutputDebugStringA("ARROW DOWN");
+      } else if (VirtualKeyCode == VK_LEFT) {
+        OutputDebugStringA("ARROW LEFT");
+      } else if (VirtualKeyCode == VK_RIGHT) {
+        OutputDebugStringA("ARROW RIGHT");
+      } else if (VirtualKeyCode == VK_ESCAPE) {
+        OutputDebugStringA("ESCAPE");
+      } else if (VirtualKeyCode == VK_SPACE) {
+        OutputDebugStringA("SPACE: ");
+        if (WasDown) {
+          OutputDebugStringA("WasDown ");
+        }
+        if (IsDown) {
+          OutputDebugStringA("IsDown ");
+        }
+        OutputDebugStringA("\n");
+      }
+    } break;
+
     case WM_PAINT: {
       PAINTSTRUCT Paint;
       HDC DeviceContext = BeginPaint(Window, &Paint);
@@ -165,7 +207,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
   Win32LoadXInput();
 
   /* Initializes all the elements of the struct with 0 */
-  WNDCLASS WindowClass = {};
+  WNDCLASSA WindowClass = {};
 
   Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
