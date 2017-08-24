@@ -57,18 +57,18 @@ internal void Win32LoadXInput(void)
   }
 }
 
-internal void RenderWeirdGradient32(win32_offscreen_buffer Buffer, int XOffset, int YOffset)
+internal void RenderWeirdGradient32(win32_offscreen_buffer *Buffer, int XOffset, int YOffset)
 {
-  uint8_t *Row = (uint8_t *)Buffer.Memory;
-  for (int Y = 0; Y < Buffer.Height; Y++) {
+  uint8_t *Row = (uint8_t *)Buffer->Memory;
+  for (int Y = 0; Y < Buffer->Height; Y++) {
     uint32_t *Pixel = (uint32_t *)Row;
-    for (int X = 0; X < Buffer.Width; X++) {
+    for (int X = 0; X < Buffer->Width; X++) {
       uint8_t Blue = X + XOffset;
       uint8_t Green = Y + YOffset;
       uint8_t Red = 0;
       *Pixel++ = (Red << 16) | (Green << 8) | Blue;
     }
-    Row += Buffer.Pitch;
+    Row += Buffer->Pitch;
   }
 }
 
@@ -112,14 +112,14 @@ internal void Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, i
   Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
-internal void Win32DisplayBufferInWindow(HDC DeviceContext, int WindowWidth, int WindowHeight,
-                                         win32_offscreen_buffer Buffer)
+internal void Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer, HDC DeviceContext,
+                                         int WindowWidth, int WindowHeight)
 {
   // TODO: Aspect ratio correction
   StretchDIBits(DeviceContext,
                 /* X, Y, Width, Height, X, Y, Width, Height, */
-                0, 0, WindowWidth, WindowHeight, 0, 0, Buffer.Width, Buffer.Height, Buffer.Memory,
-                &Buffer.Info, DIB_RGB_COLORS, SRCCOPY);
+                0, 0, WindowWidth, WindowHeight, 0, 0, Buffer->Width, Buffer->Height,
+                Buffer->Memory, &Buffer->Info, DIB_RGB_COLORS, SRCCOPY);
 }
 
 LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
@@ -187,8 +187,8 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window, UINT Message, WPARAM wPara
       PAINTSTRUCT Paint;
       HDC DeviceContext = BeginPaint(Window, &Paint);
       win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-      Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height,
-                                 GlobalBackBuffer);
+      Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width,
+                                 Dimension.Height);
       EndPaint(Window, &Paint);
     } break;
 
@@ -280,10 +280,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         // Vibration.wRightMotorSpeed = 60000;
         // XInputSetState(0, &Vibration);
 
-        RenderWeirdGradient32(GlobalBackBuffer, XOffset, YOffset);
+        RenderWeirdGradient32(&GlobalBackBuffer, XOffset, YOffset);
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-        Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height,
-                                   GlobalBackBuffer);
+        Win32DisplayBufferInWindow(&GlobalBackBuffer,DeviceContext, Dimension.Width, Dimension.Height
+                                   );
 
         ++XOffset;
       }
