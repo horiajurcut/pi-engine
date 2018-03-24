@@ -268,6 +268,9 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
             int16_t ThumbLY = GamePad->sThumbLY;
 
             // NOTE: Small test to see if the controller code is working
+            XOffset += ThumbLX >> 12;
+            YOffset += ThumbLY >> 12;
+
             if (AButton) {
               YOffset += 2;
             }
@@ -282,10 +285,13 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
         RenderWeirdGradient32(&GlobalBackBuffer, XOffset, YOffset);
         win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-        Win32DisplayBufferInWindow(&GlobalBackBuffer,DeviceContext, Dimension.Width, Dimension.Height
-                                   );
 
+        // NOTE: Move the squares on screen
         ++XOffset;
+        ++YOffset;
+
+        Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext, Dimension.Width,
+                                   Dimension.Height);
       }
       // TODO: We may not need to release the DC at all?
       ReleaseDC(Window, DeviceContext);
